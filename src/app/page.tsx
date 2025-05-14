@@ -39,7 +39,7 @@ const sortQuestions = (questions: string[]) => {
 
 export default function Home() {
   const router = useRouter(); // Initialize useRouter
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null); // null initially, then boolean
+  const [isAuthenticated, setIsAuthenticated] = React.useState<null | boolean>(null);
 
   const [imageDataUris, setImageDataUris] = React.useState<string[]>([]);
   const [aggregatedTableData, setAggregatedTableData] = React.useState<AggregatedData>({ sheets: {}, questions: [] });
@@ -59,27 +59,15 @@ export default function Home() {
 
 
   React.useEffect(() => {
-    // Check authentication status on component mount
-    const authStatus = localStorage.getItem('isAuthenticated');
+    // Only run on client
+    const authStatus = typeof window !== 'undefined' ? localStorage.getItem('isAuthenticated') : null;
     if (authStatus !== 'true') {
+      setIsAuthenticated(false);
       router.push('/login');
     } else {
       setIsAuthenticated(true);
     }
-
-    try {
-      const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedData) {
-        const parsedData: AggregatedData = JSON.parse(storedData);
-        setProcessedSheetCount(Object.keys(parsedData.sheets).length);
-        setAggregatedTableData(parsedData);
-      }
-    } catch (error) {
-      console.error('Failed to load data from localStorage:', error);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      setProcessedSheetCount(0);
-    }
-  }, [router]); // Add router to dependency array
+  }, [router]);
 
   React.useEffect(() => {
     if (isCameraOpen) {
@@ -335,8 +323,8 @@ export default function Home() {
   const allProcessedOrFinalized = processingStates.every(s => s.status === 'done' || s.status === 'error') && 
                                   processingStates.filter(s => s.status === 'done').every(s => s.data && aggregatedTableData.sheets[s.data.regNo]);
 
-  // If authentication status is not yet determined, show a loading spinner or nothing
   if (isAuthenticated === null) {
+    // Show loading spinner or message while checking auth
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner size={48} />
@@ -344,6 +332,10 @@ export default function Home() {
     );
   }
 
+  if (!isAuthenticated) {
+    // Prevent rendering if not authenticated
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-background py-8">
