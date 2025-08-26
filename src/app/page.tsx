@@ -57,6 +57,7 @@ export default function Home() {
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const [cameraFacing, setCameraFacing] = React.useState<'environment' | 'user'>('environment');
 
 
   React.useEffect(() => {
@@ -75,37 +76,44 @@ export default function Home() {
     }
   }, []);
 
-  React.useEffect(() => {
-    if (isCameraOpen) {
-      const getCameraPermission = async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setHasCameraPermission(true);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-          setCameraError(null);
-        } catch (error) {
-          console.error('Error accessing camera:', error);
-          setHasCameraPermission(false);
-          setCameraError('Camera access denied. Please enable camera permissions in your browser settings.');
-          toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions in your browser settings.',
-          });
-          setIsCameraOpen(false); // Close camera view if permission denied
-        }
-      };
-      getCameraPermission();
-    } else {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-        videoRef.current.srcObject = null;
+  const startCamera = React.useCallback(async () => {
+    if (!isCameraOpen) return;
+    if (videoRef.current && videoRef.current.srcObject) {
+      const prev = videoRef.current.srcObject as MediaStream;
+      prev.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
+    try {
+      const constraints: MediaStreamConstraints = { video: { facingMode: { ideal: cameraFacing } }, audio: false };
+      let stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setHasCameraPermission(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraError(null);
+    } catch (err) {
+      try {
+        const fb = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        setHasCameraPermission(true);
+        if (videoRef.current) videoRef.current.srcObject = fb;
+        setCameraError(null);
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        setCameraError('Camera access denied. Please enable camera permissions in your browser settings.');
+        toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser settings.' });
+        setIsCameraOpen(false);
       }
     }
-  }, [isCameraOpen, toast]);
+  }, [cameraFacing, isCameraOpen, toast]);
+
+  React.useEffect(() => {
+    if (isCameraOpen) {
+      startCamera();
+    } else if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, [isCameraOpen, startCamera]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -384,8 +392,13 @@ export default function Home() {
                      </Alert>
                    )}
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button onClick={captureImage} disabled={!hasCameraPermission || !!cameraError}>Capture Image</Button>
+                <CardFooter className="flex flex-col sm:flex-row gap-3 sm:justify-between">
+                  <div className="flex gap-3">
+                    <Button onClick={captureImage} disabled={!hasCameraPermission || !!cameraError}>Capture Image</Button>
+                    <Button variant="secondary" onClick={() => setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment')}>
+                      {cameraFacing === 'environment' ? 'Use Front Camera' : 'Use Back Camera'}
+                    </Button>
+                  </div>
                   <Button onClick={closeCamera} variant="outline">Close Camera</Button>
                 </CardFooter>
               </Card>

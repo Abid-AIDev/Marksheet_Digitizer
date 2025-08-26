@@ -25,7 +25,19 @@ export default function LoginPage() {
   const [loading, setLoading] = React.useState(false);
   const [emailError, setEmailError] = React.useState('');
 
-  const supabase = createClient();
+  // Create Supabase client only when needed (client-side only)
+  const getSupabaseClient = () => {
+    if (typeof window === 'undefined') {
+      // Return mock client for server-side rendering
+      return {
+        auth: {
+          signUp: async () => ({ error: { message: 'Not available during build' } }),
+          signInWithPassword: async () => ({ error: { message: 'Not available during build' } }),
+        },
+      } as any;
+    }
+    return createClient();
+  };
 
   // Validate email domain for JECC organization
   const validateJECCEmail = (email: string) => {
@@ -62,6 +74,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -85,6 +98,7 @@ export default function LoginPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

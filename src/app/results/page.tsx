@@ -120,8 +120,16 @@ export default function ResultsPage() {
       const link = document.createElement('a');
       link.href = url;
       link.download = 'consolidated_marks_data.xlsx';
-      link.click();
-      window.URL.revokeObjectURL(url);
+      link.target = '_blank';
+      document.body.appendChild(link);
+      try {
+        link.click();
+      } catch (e) {
+        window.open(url, '_blank');
+      } finally {
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      }
       toast({
         title: 'Export Successful',
         description: 'Marksheet data exported to Excel.',

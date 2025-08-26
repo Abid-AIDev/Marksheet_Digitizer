@@ -331,9 +331,9 @@ export default function MergePage() {
 
         <Card className="shadow-xl border-border/50 overflow-hidden mb-8">
           <CardHeader>
-            <CardTitle>Step 1: Upload CSV File</CardTitle>
+            <CardTitle>Step 1: Upload etlab CSV File</CardTitle>
             <CardDescription>
-              Select the CSV file containing student admission numbers and names. 
+              Select the etlab CSV file containing student admission numbers and names. 
               Ensure it has an &quot;{CSV_ADMISSION_NO_HEADER}&quot; column.
             </CardDescription>
           </CardHeader>
