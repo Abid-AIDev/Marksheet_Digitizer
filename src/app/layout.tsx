@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ['latin'] }); // Initialize Inter font
 export const metadata: Metadata = {
   title: 'MarkSheet Digitizer', // Update title
   description: 'Digitize marks from marksheets accurately.', // Update description
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -18,6 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
+
       <body className={`${inter.className} antialiased flex flex-col min-h-full`}> {/* Use Inter font class and ensure full height */}
         <main className="flex-grow">
           {children}

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, UploadCloud, Merge, Download, Loader2, AlertTriangle, FileDiff } from 'lucide-react';
 import type { AggregatedData } from '@/types/marksheet';
-import * as XLSX from 'xlsx';
+
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const LOCAL_STORAGE_KEY = 'markSheetData';

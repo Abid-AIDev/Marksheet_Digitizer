@@ -25,7 +25,7 @@ import {
 import { ConsolidatedMarksTable } from '@/components/consolidated-marks-table';
 import { AlertTriangle, ArrowLeft, Download, Loader2, Eraser, Trash2, FileText } from 'lucide-react'; 
 import type { AggregatedData } from '@/types/marksheet';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { useToast } from '@/hooks/use-toast';
 
 const LOCAL_STORAGE_KEY = 'markSheetData';
@@ -76,7 +76,7 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!aggregatedData || Object.keys(aggregatedData.sheets).length === 0) {
         toast({
             variant: 'destructive',
@@ -101,11 +101,27 @@ export default function ResultsPage() {
         return row;
       });
 
-      const worksheetData = [header, ...dataRows];
-      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Consolidated Marks');
-      XLSX.writeFile(wb, 'consolidated_marks_data.xlsx');
+      // Create workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Consolidated Marks');
+      
+      // Add header row
+      worksheet.addRow(header);
+      
+      // Add data rows
+      dataRows.forEach(row => {
+        worksheet.addRow(row);
+      });
+      
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'consolidated_marks_data.xlsx';
+      link.click();
+      window.URL.revokeObjectURL(url);
       toast({
         title: 'Export Successful',
         description: 'Marksheet data exported to Excel.',

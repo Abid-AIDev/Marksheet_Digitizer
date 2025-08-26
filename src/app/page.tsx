@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ImageUpload } from '@/components/image-upload';
@@ -12,10 +12,11 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { extractMarksAndRegNoFromImage, type ExtractMarksAndRegNoOutput, type QuestionMarks } from '@/ai/flows/extract-marks-from-image';
 import type { AggregatedData, SheetData, SheetMark } from '@/types/marksheet';
-import { AlertTriangle, Wand2, UploadCloud, Library, Save, ArrowRight, FileSpreadsheet, Camera } from 'lucide-react';
+import { AlertTriangle, Wand2, UploadCloud, Library, Save, ArrowRight, FileSpreadsheet, Camera, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { createClient } from '@/lib/supabase/client';
 
 const LOCAL_STORAGE_KEY = 'markSheetData';
 
@@ -38,8 +39,9 @@ const sortQuestions = (questions: string[]) => {
 
 
 export default function Home() {
-  const router = useRouter(); // Initialize useRouter
-  const [isAuthenticated, setIsAuthenticated] = React.useState<null | boolean>(null);
+  const router = useRouter(); 
+  const supabase = createClient();
+  const { toast } = useToast();
 
   const [imageDataUris, setImageDataUris] = React.useState<string[]>([]);
   const [aggregatedTableData, setAggregatedTableData] = React.useState<AggregatedData>({ sheets: {}, questions: [] });
@@ -50,7 +52,6 @@ export default function Home() {
   const [currentReviewSheet, setCurrentReviewSheet] = React.useState<SheetData | null>(null);
   const [currentReviewSheetRegNo, setCurrentReviewSheetRegNo] = React.useState<string | null>(null);
 
-  const { toast } = useToast();
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
@@ -59,15 +60,20 @@ export default function Home() {
 
 
   React.useEffect(() => {
-    // Only run on client
-    const authStatus = typeof window !== 'undefined' ? localStorage.getItem('isAuthenticated') : null;
-    if (authStatus !== 'true') {
-      setIsAuthenticated(false);
-      router.push('/login');
-    } else {
-      setIsAuthenticated(true);
+    // Data loading from localStorage remains a client-side convenience.
+    try {
+      const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedData) {
+        const parsedData: AggregatedData = JSON.parse(storedData);
+        setProcessedSheetCount(Object.keys(parsedData.sheets).length);
+        setAggregatedTableData(parsedData);
+      }
+    } catch (error) {
+      console.error('Failed to load data from localStorage:', error);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setProcessedSheetCount(0);
     }
-  }, [router]);
+  }, []);
 
   React.useEffect(() => {
     if (isCameraOpen) {
@@ -100,6 +106,12 @@ export default function Home() {
       }
     }
   }, [isCameraOpen, toast]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   const mapAiOutputToSheetData = (data: ExtractMarksAndRegNoOutput): SheetData => {
     const sheetMarks: SheetMark[] = [];
@@ -153,15 +165,9 @@ export default function Home() {
 
     for (let i = 0; i < processingStates.length; i++) {
       if (processingStates[i].status === 'pending' || processingStates[i].status === 'error') {
-        // Find the correct index in imageDataUris that corresponds to the processingState item
-        // This assumes imageDataUris and processingStates are kept in sync or imageDataUris is appended to
-        // and processingStates reflects this by appending as well.
-        // A more robust way would be to store the URI within the processingState item itself if possible.
         const originalIndex = imageDataUris.findIndex(uri => 
-            processingStates[i].name.endsWith(String(imageDataUris.indexOf(uri) + imageDataUris.length - processingStates.length +1)) ||  // Heuristic for "Image X"
-            processingStates[i].name === uri.substring(uri.lastIndexOf('/') + 1) // if name is filename
+            processingStates[i].name.endsWith(String(imageDataUris.indexOf(uri) + imageDataUris.length - processingStates.length +1))
         );
-        // Fallback if name matching is tricky; assume order for now if a direct match fails
         const dataUriToProcess = imageDataUris[originalIndex !== -1 ? originalIndex : i];
 
 
@@ -172,7 +178,6 @@ export default function Home() {
           await new Promise(resolve => setTimeout(resolve, 200)); 
           setProcessingStates(prev => prev.map((s, idx) => idx === i ? { ...s, progress: 30 } : s));
           
-          // Pass the correctly identified dataUriToProcess
           const result = await extractMarksAndRegNoFromImage({ markSheetImageDataUri: dataUriToProcess });
           
           await new Promise(resolve => setTimeout(resolve, 300)); 
@@ -323,19 +328,6 @@ export default function Home() {
   const allProcessedOrFinalized = processingStates.every(s => s.status === 'done' || s.status === 'error') && 
                                   processingStates.filter(s => s.status === 'done').every(s => s.data && aggregatedTableData.sheets[s.data.regNo]);
 
-  if (isAuthenticated === null) {
-    // Show loading spinner or message while checking auth
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size={48} />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    // Prevent rendering if not authenticated
-    return null;
-  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-background py-8">
@@ -351,6 +343,10 @@ export default function Home() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0">
+             <Button onClick={handleSignOut} variant="outline">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </Button>
             <Badge variant="secondary" className="py-2 px-4 text-sm">
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Processed Sheets: {processedSheetCount}
             </Badge>
